@@ -1,0 +1,19 @@
+# Entorno virtual
+.venv/
+
+# Modelos exportados (se generan al ejecutar el notebook)
+modelos/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sistema
+.DS_Store
+*~
+
+# Documento interno de trabajo del equipo
+*.docx
