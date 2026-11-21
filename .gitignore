@@ -1,8 +1,12 @@
 # Entorno virtual
 .venv/
 
-# Modelos exportados (se generan al ejecutar el notebook)
-modelos/
+# Datos (se descargan de Kaggle; ver README)
+data/*.csv
+
+# Intermedios de la exportación (los modelos finales sí se suben)
+modelos/saved_model/
+modelos/*.joblib
 
 # Python
 __pycache__/
@@ -15,5 +19,5 @@ __pycache__/
 .DS_Store
 *~
 
-# Documento interno de trabajo del equipo
+# Documentos internos de trabajo del equipo
 *.docx

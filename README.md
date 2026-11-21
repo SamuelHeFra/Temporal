@@ -1,61 +1,68 @@
-# Checador virtual con IA
+# Detección temprana de estrés estudiantil con IA
 
-**Proyecto final · Sistemas Inteligentes (MAC, semestre 2027-1)** · Startup basada en Inteligencia Artificial
+**Proyecto final · Sistemas Inteligentes (MAC, 2027-1)** · *nombre de la startup pendiente*
 
-Las rutas de transporte concesionado en México (combis, microbuses y camiones urbanos) se regulan a mano: un checador parado en un punto anota a qué hora pasa cada unidad y avisa cuánto le lleva la de adelante. Solo hay información donde hay checador, y las unidades terminan **amontonadas**: varias pasan juntas y luego dejan huecos largos.
+Muchos estudiantes llegan al área de orientación cuando el estrés ya afectó sus calificaciones o su salud, o nunca llegan. Proponemos una **autoevaluación de 6 preguntas** en la que un modelo de IA estima si el nivel de estrés del alumno es **bajo, medio o alto** y le muestra los factores que más pesan. El modelo se ejecuta incluso en el navegador, sin enviar las respuestas a un servidor.
 
-Proponemos un **checador virtual con IA** que rastrea las unidades de la ruta, **predice cuándo llegarán a cada parada** y **avisa al conductor** cuando se está pegando a la unidad de adelante.
+> Herramienta de apoyo y orientación. **No es un diagnóstico clínico.**
 
-| Usuario | Qué obtiene |
-| --- | --- |
-| Pasajero | Tiempo estimado de llegada de la siguiente unidad a su parada |
-| Conductor | Avisos cortos: cuánto le lleva la unidad de adelante y si debe bajar o mantener el ritmo |
-| Checador | Vista de toda la ruta, alertas de amontonamiento y reporte del día |
+## Datos
 
-## Contenido
+- **Fuente:** [Student Early Stress Detection](https://www.kaggle.com/datasets/rishavraj1232/student-early-stress-detection) (Rishav Raj, Kaggle, v2). Licencia CC BY-SA 4.0 (en Kaggle aparece también como CC BY 4.0; tomamos la más restrictiva).
+- **Auditoría:** el dataset une 6 fuentes. Solo `stress_survey` (**1,100 alumnos**) tiene una señal de estrés real:
 
-| Archivo | Qué es |
-| --- | --- |
-| `checador_virtual_ia.ipynb` | Notebook principal: simulador de la ruta, modelos de IA, regulación, demostración y conclusiones |
-| `requirements.txt` | Dependencias con versiones fijas |
-| `modelos/` | Se genera al ejecutar el notebook: modelos entrenados y configuración |
-
-### Qué hace el notebook
-
-1. **Simulador** de una ruta ficticia de 14 paradas y 32 unidades durante 42 días. Los tiempos son supuestos del equipo. El amontonamiento surge solo, igual que en la calle.
-2. **Predicción de llegada (ETA)** con *gradient boosting* y con una **red neuronal (Keras)**. Ambos se comparan contra el tiempo por experiencia y el promedio histórico.
-3. **Detección temprana de amontonamiento** a 3 paradas, comparada contra la regla del checador.
-4. **Regulación**: se resimulan los días de prueba con 4 formas de operar (sin control, checador, regla en todas las paradas e IA).
-5. **Demostración** de lo que verían el pasajero, el conductor y el checador.
-
-## Resultados (8 días de prueba, datos simulados)
-
-| Indicador | Sin IA | Con la solución |
+| Fuente | Filas | Problema |
 | --- | --- | --- |
-| Error medio al predecir la llegada | 5.9 min (experiencia) / 2.5 min (promedio histórico) | **1.8 min** |
-| Llegadas amontonadas | 12.9 % sin control / 6.2 % con checador | **3.3 %** |
-| Espera promedio del pasajero | 4.75 / 4.46 min | **4.37 min** |
+| `mental_health` | 150,000 | Ruido: ninguna columna predice el estrés |
+| `dropout_risk_2026` | 100,000 | Fuga del objetivo: `anxiety_score` es idéntica al estrés |
+| `oulad`, `uci_dropout`, `uci_performance` | 38,061 | Estrés deducido de la reprobación (`clase = at_risk × 2`) |
+| `stress_survey` | **1,100** | Señal real: se usa para entrenar |
 
-> **Sobre los datos.** No contamos con registros reales de una ruta: todo se genera con un simulador. Lo que se demuestra es que el sistema funciona y supera a métodos simples dentro de la simulación. La precisión real se validaría con una ruta piloto.
+- **Entradas del modelo:** horas de sueño, horas de estudio a la semana, apoyo social, presión académica, actividades extracurriculares y promedio.
+- **No se piden** datos demográficos, socioeconómicos ni escalas clínicas (ansiedad, depresión, burnout). Quitarlos **no cuesta precisión** (ver la sección 10 del notebook).
 
-## Cómo ejecutarlo
+## Resultados
 
-Requiere **Python 3.14**.
+| Modelo | F1 macro, validación cruzada de 5 particiones | F1 macro en prueba (165 alumnos) | Recall de estrés alto en prueba |
+| --- | --- | --- | --- |
+| Clase mayoritaria | — | 0.17 | 0.00 |
+| Regresión logística | 0.88 ± 0.02 | 0.88 | 0.95 |
+| Gradient boosting | 0.90 ± 0.01 | 0.88 | 0.93 |
+| **Red Keras (producción)** | **0.89 ± 0.01** | **0.86** | **0.91** |
+
+Los tres modelos están empatados. Se elige la red porque es la única que se exporta a TFLite y a la web sin servidor.
+
+**Limitaciones:**
+- Los datos no son de México.
+- El dataset es demasiado separable (una sola pregunta ya predice mucho), así que estas métricas son un techo optimista.
+- El notebook propone un **estudio local** con alumnos de la facultad para validar el modelo y ajustarlo (*fine-tuning*).
+
+## Modelos exportados (`modelos/`)
+
+| Archivo | Uso |
+| --- | --- |
+| `contrato.json` | **Interfaz común**: orden, unidades, rangos y conversión de las 6 entradas, clases de salida, mensajes y métricas |
+| `modelo_estres.keras` | API: `keras.models.load_model(...)` |
+| `modelo_estres.tflite` | App móvil, o TFLite en el navegador |
+| `pesos_web.json` | Web sin servidor: normalización y pesos para calcular la red en JavaScript |
+
+El modelo recibe los valores **tal como los captura el formulario**, porque la normalización va dentro de la red. Los tres formatos dan las mismas probabilidades (diferencia < 1e-6), y el notebook lo verifica.
+
+## Cómo ejecutar
 
 ```bash
-python3 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-jupyter lab checador_virtual_ia.ipynb
+# Descarga el dataset de Kaggle y copia final_student_dataset.csv en data/
+jupyter nbconvert --to notebook --execute --inplace modelo_estres.ipynb   # ~1 min en CPU
 ```
-
-Ejecuta todas las celdas en orden; tarda unos 4 minutos en CPU, la mayor parte en entrenar la red neuronal. Los resultados son reproducibles (semilla 42).
 
 ## Equipo
 
-| Integrante | Módulo |
+| Integrante | Parte |
 | --- | --- |
-| _Pendiente_ | Datos y simulador |
-| _Pendiente_ | Modelos de IA y evaluación |
-| _Pendiente_ | Regulación y escenarios |
-| _Pendiente_ | Demostración y conclusiones |
+| *pendiente* | Modelo (este notebook) |
+| *pendiente* | API |
+| *pendiente* | Web |
+| *pendiente* | *pendiente* |
